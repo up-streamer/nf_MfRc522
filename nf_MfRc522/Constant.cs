@@ -61,6 +61,11 @@ namespace Driver.MfRc522
         {
             ReqA = 0x26,
             MifareRead = 0x30,
+            MifareWrite = 0xA0,
+            MifareDecrement = 0xC0,
+            MifareIncrement = 0xC1, 
+            MifareRestore = 0xC2,
+            MifareTransfer = 0xB0,
             HaltA = 0x50,
             AuthenticateKeyA = 0x60,
             AuthenticateKeyB = 0x61,
