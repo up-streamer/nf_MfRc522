@@ -5,5 +5,5 @@ MFRC522 RFID card driver
 # Diagram
 
 <p align="center">
-  <img src="nf_MfRc522/nf_MfRc522/ESP32-RC522.jpg" width="155" title="ESP32 Dev.kit v1 nf SPI 1">
+  <img src="https://github.com/up-streamer/nf_MfRc522/blob/master/nf_MfRc522/ESP32-RC522.jpg" width="155" title="ESP32 Dev.kit v1 nf SPI 1">
 </p>
