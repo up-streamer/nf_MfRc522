@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading;
+using System.Collections;
 using Windows.Devices.Gpio;
 using Windows.Devices.Spi;
 using Driver.MfRc522.Constants;
@@ -60,9 +61,9 @@ namespace Driver.MfRc522
                 DataBitLength = 8,
                 Mode = SpiMode.Mode0,
             };
-            
+
             _spi = SpiDevice.FromId(spiBus, settings);
-            
+
             HardReset();
             SetDefaultValues();
         }
@@ -247,15 +248,15 @@ namespace Driver.MfRc522
             return StatusCode.Ok;
         }
 
-       [ConditionalAttribute("MYDEBUG")]
+        [ConditionalAttribute("MYDEBUG")]
         private void DisplayBuffer(byte[] buffer)
         {
-           Debug.WriteLine("#Data:");
-           Debug.WriteLine($"Length: {buffer.Length}");
+            Debug.WriteLine("#Data:");
+            Debug.WriteLine($"Length: {buffer.Length}");
             var str = "";
             for (int i = 0; i < buffer.Length; i++)
                 str += $"{buffer[i]:X2} ";
-           Debug.WriteLine($"{str}");
+            Debug.WriteLine($"{str}");
         }
 
         private StatusCode PiccRequestA(byte[] bufferAtqa)
@@ -348,6 +349,63 @@ namespace Driver.MfRc522
                     return null;
             }
         }
+        private byte[][] data = new byte[3][];
+
+        private bool init = false;
+        private void InitData()
+        {
+            if (!init)
+            {   data[0] = new byte[16];
+                data[1] = new byte[16];
+                data[2] = new byte[16];
+            }
+
+            for (int i = 0; i < 3; i++)
+            {
+                for (int j = 0; j < 16; j++)
+                {
+                    data[i][j] = 0xff;
+                }
+            }
+        }
+        
+        
+        public StatusCode PutSector(ArrayList dataBlock, Uid uid, byte sector, byte[] key, PiccCommand authenticateType = PiccCommand.AuthenticateKeyA)
+        {
+            InitData();
+
+            StatusCode sc = StatusCode.Ok;
+            if (key == null || key.Length != 6) throw new ArgumentException("Key must be a byte[] of length 6.", nameof(key));
+
+            switch (uid.GetPiccType())
+            {
+                case PiccType.Mifare1K:
+                    for (int i = 0; i < 3; i++)
+                    {
+                        if (dataBlock[i] != null)
+                        {
+                            var line = (char[])dataBlock[i];
+                            if (line.Length > 16) throw new ArgumentException("dataBlock line must be 16 char. max lenght", nameof(line));
+
+                            foreach (char item in line)
+                            {
+                                for (int j = 0; j < line.Length; j++)
+                                {
+                                    data[i][j] = (byte)item;
+                                }
+                            }
+                        }
+                    }
+                    sc = PutMifare1KSector(uid, sector, key, data, authenticateType);
+                    return sc;
+                    
+                // case PiccType.MifareUltralight:
+                //    return GetMifareUltraLight(pageOrSector);
+                default:
+                    return sc = StatusCode.Error;
+            }
+
+        }
 
         private byte[][] GetMifareUltraLight(byte page)
         {
@@ -362,7 +420,37 @@ namespace Driver.MfRc522
                 Array.Copy(buffer, j * 4, resultBuffer[j], 0, 4);
             return resultBuffer;
         }
+        private StatusCode PutMifare1KSector(Uid uid, byte sector, byte[] key, byte [][] data, PiccCommand cmd = PiccCommand.AuthenticateKeyA)
+        {
+            if (sector > 15) throw new ArgumentOutOfRangeException(nameof(sector), "Sector must be between 0 and 16.");
+            byte numberOfBlocks = 4;
+            var firstblock = sector * numberOfBlocks;
+            var isTrailerBlock = true;
+            byte[] buffer = new byte[18];
+            StatusCode sc = StatusCode.Ok;
 
+            for (int i = numberOfBlocks - 1; i >= 0; i--)
+            {
+                var blockAddr = (byte)(firstblock + i);
+                if (isTrailerBlock)
+                {
+                    sc = Authenticate(uid, key, blockAddr, cmd);
+                    if (sc != StatusCode.Ok) throw new Exception($"Authenticate() failed:{sc}");
+                }
+                // Write block
+                else
+                {
+                    sc = MifareWrite(blockAddr, data[i]);
+                    if (sc != StatusCode.Ok) throw new Exception($"MifareWrite() failed:{sc}");
+                }
+                if (isTrailerBlock)
+                {
+                    isTrailerBlock = false;
+                }
+               /// Array.Copy(buffer, returnBuffer[i], 16); It is writting, no return data
+            }
+            return sc;
+        }
         private byte[][] GetMifare1KSector(Uid uid, byte sector, byte[] key, PiccCommand cmd = PiccCommand.AuthenticateKeyA)
         {
             if (sector > 15) throw new ArgumentOutOfRangeException(nameof(sector), "Sector must be between 0 and 16.");
@@ -416,6 +504,28 @@ namespace Driver.MfRc522
             if (sc != StatusCode.Ok) return sc;
             if (buffer[16] == crc[0] && buffer[17] == crc[1]) return StatusCode.Ok;
             return StatusCode.CrcError;
+        }
+
+        private StatusCode MifareWrite(byte blockAddr, byte[] buffer)
+        {
+            byte[] cmdBuffer = new byte[4];
+            var sc = StatusCode.Ok;
+            if (buffer == null || buffer.Length != 18) return StatusCode.NoRoom;
+            cmdBuffer[0] = (byte)PiccCommand.MifareWrite;
+            cmdBuffer[1] = blockAddr;
+            sc = CalculateCrc(cmdBuffer, 2, cmdBuffer, 2);
+            if (sc != StatusCode.Ok) return sc;
+            byte validBits = 0;
+
+            sc = TransceiveData(cmdBuffer, buffer, ref validBits);
+            return sc;
+
+            // Check CRC - This was to check the incoming (read) buffer data and we're writting here!
+            //byte[] crc = new byte[2];
+            //sc = CalculateCrc(buffer, 16, crc, 0);
+            //if (sc != StatusCode.Ok) return sc;
+            //if (buffer[16] == crc[0] && buffer[17] == crc[1]) return StatusCode.Ok;
+            //return StatusCode.CrcError;
         }
 
         /// <summary>

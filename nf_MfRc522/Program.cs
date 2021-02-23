@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Diagnostics;
 using System.Threading;
+using System.Collections;
 //using Bauland.Others;
 using Driver.MfRc522;
 using Driver.MfRc522.Constants;
@@ -33,14 +34,15 @@ namespace testRC522
             Debug.WriteLine("");
 
             //_mfRc522.Test();
-
-            InfiniteLoop();
+            byte[] defaultKey = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+            InfiniteLoop(defaultKey);
         }
-
-        private static void InfiniteLoop()
+        
+ 
+        private static void InfiniteLoop(byte[] key)
         {
             byte[] bufferAtqa = new byte[2];
-            byte[] defaultKey = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
+            byte[] defaultKey = key;
 
             while (true)
             {
@@ -87,6 +89,23 @@ namespace testRC522
                 Thread.Sleep(1000);
             }
             // ReSharper disable once FunctionNeverReturns
+        }
+
+        private static byte[][] ReadSector(byte sector, byte[] key)
+        {
+            var uid = _mfRc522.PiccReadCardSerial();
+            var buffer = _mfRc522.GetSector(uid, sector, key);
+            return buffer;
+        }
+
+        private static void WriteSector(ArrayList data, byte sector, byte[] key)
+        {
+            data[1] = "Test1";
+            data[2] = " Test2";
+            data[3] = "  Test3";
+
+            var uid = _mfRc522.PiccReadCardSerial();
+            _mfRc522.PutSector(data, uid, sector, key);
         }
 
         private static void DisplayUltralightBuffer(byte[][] buffer)
