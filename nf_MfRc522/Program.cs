@@ -35,7 +35,15 @@ namespace testRC522
 
             //_mfRc522.Test();
             byte[] defaultKey = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-            InfiniteLoop(defaultKey);
+            ArrayList writeData[];
+            byte writeSector = 2;
+            writeData[1] = "Test1";
+            writeData[2] = " Test2";
+            writeData[3] = "  Test3";
+
+            ///InfiniteLoop(defaultKey);    
+
+            WriteSector(writeData, writeSector, defaultKey); //for write test, comment this and uncomment InfiniteLoop()
         }
         
  
@@ -100,9 +108,6 @@ namespace testRC522
 
         private static void WriteSector(ArrayList data, byte sector, byte[] key)
         {
-            data[1] = "Test1";
-            data[2] = " Test2";
-            data[3] = "  Test3";
 
             var uid = _mfRc522.PiccReadCardSerial();
             _mfRc522.PutSector(data, uid, sector, key);
