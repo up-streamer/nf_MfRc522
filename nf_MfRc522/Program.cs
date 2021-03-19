@@ -35,15 +35,16 @@ namespace testRC522
 
             //_mfRc522.Test();
             byte[] defaultKey = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
-            ArrayList writeData[];
-            byte writeSector = 2;
-            writeData[1] = "Test1";
-            writeData[2] = " Test2";
-            writeData[3] = "  Test3";
 
-            ///InfiniteLoop(defaultKey);    
+            byte writeSector = 0x2;
+            ArrayList writeData = new ArrayList();
+            writeData.Add("Test1");
+            writeData.Add(" Test2");
+            writeData.Add("  Test3");
 
-            WriteSector(writeData, writeSector, defaultKey); //for write test, comment this and uncomment InfiniteLoop()
+            InfiniteLoop(defaultKey);    
+
+            //WriteSector(writeData, writeSector, defaultKey); //for write test, comment this and uncomment InfiniteLoop()
         }
         
  
@@ -108,9 +109,24 @@ namespace testRC522
 
         private static void WriteSector(ArrayList data, byte sector, byte[] key)
         {
+            bool tryWrite = true;
+            byte[] bufferAtqa = new byte[2];
 
-            var uid = _mfRc522.PiccReadCardSerial();
-            _mfRc522.PutSector(data, uid, sector, key);
+            while (tryWrite)
+            {
+                if (_mfRc522.IsNewCardPresent(bufferAtqa))
+                {
+                    Debug.WriteLine("Card detected...");
+                    Debug.WriteLine($"ATQA: 0x{bufferAtqa[1]:X2},0x{bufferAtqa[0]:X2}");
+
+                    var uid = _mfRc522.PiccReadCardSerial();
+                    _mfRc522.PutSector(data, uid, sector, key);
+
+                    tryWrite = false;
+                    _mfRc522.Halt();
+                    _mfRc522.StopCrypto();
+                }
+            }
         }
 
         private static void DisplayUltralightBuffer(byte[][] buffer)
@@ -167,6 +183,8 @@ namespace testRC522
         {
             _mfRc522 = new MfRc522("SPI1", 4, 5);
             // _mfRc522 = new MfRc522(FEZ.SpiBus.Spi1, FEZ.GpioPin.D8, FEZ.GpioPin.D9);
+
+
         }
     }
 }

@@ -55,11 +55,13 @@ namespace Driver.MfRc522
                 // If necessary
                 //BitOrder = DataBitOrder.LSB,
                 //ChipSelectActiveState = false,
-                ChipSelectLine = csPin,
+              
+                //ChipSelectLine = csPin,
                 //ChipSelectType = SpiChipSelectType.Gpio,
                 ClockFrequency = 7_000_000, // Was 10_000_000 droppped due instabiities and bit rotate issues
                 DataBitLength = 8,
                 Mode = SpiMode.Mode0,
+             
             };
 
             _spi = SpiDevice.FromId(spiBus, settings);
@@ -70,9 +72,13 @@ namespace Driver.MfRc522
 
         private void SetDefaultValues()
         {
+            WriteRegister(Register.RxMode, 0x00);  // new configs from Balboa
+            WriteRegister(Register.TxMode, 0x00);  
+            WriteRegister(Register.ModeWith, 0x26);
+
             // Set Timer for Timeout
             WriteRegister(Register.TimerMode, 0x80);
-            WriteRegister(Register.TimerPrescaler, 0xA9);
+            WriteRegister(Register.TimerPrescaler, 0xA9); 
             WriteRegister(Register.TimerReloadHigh, 0x06);
             WriteRegister(Register.TimerReloadLow, 0xE8);
 
@@ -193,7 +199,7 @@ namespace Driver.MfRc522
                     if (crcStatus != StatusCode.Ok) return crcStatus;
                 }
 
-                DisplayBuffer(buffer);
+                //DisplayBuffer(buffer);
                 byte validbits = 0;
                 WriteRegister(Register.BitFraming, 0);
 
@@ -248,7 +254,7 @@ namespace Driver.MfRc522
             return StatusCode.Ok;
         }
 
-        [ConditionalAttribute("MYDEBUG")]
+       // [ConditionalAttribute("MYDEBUG")]
         private void DisplayBuffer(byte[] buffer)
         {
             Debug.WriteLine("#Data:");
@@ -288,15 +294,15 @@ namespace Driver.MfRc522
             byte bitFraming = txLastBits;
 
             WriteRegister(Register.Command, (byte)PcdCommand.Idle);
-            WriteRegister(Register.ComIrq, 0x7f);
-            WriteRegister(Register.FifoLevel, 0x80);
+            WriteRegister(Register.ComIrq, 0x7f);           // Clear ComIrq register
+            WriteRegister(Register.FifoLevel, 0x80);        //Flush FIFO
             WriteRegister(Register.FifoData, sendData);
-            WriteRegister(Register.BitFraming, bitFraming);
+            WriteRegister(Register.BitFraming, bitFraming); // Zero disable multibyte transmission to PCD
             WriteRegister(Register.Command, (byte)cmd);
 
             if (cmd == PcdCommand.Transceive)
             {
-                SetRegisterBit(Register.BitFraming, 0x80);
+                SetRegisterBit(Register.BitFraming, 0x80); // Starts the transmission of data to PCD, valid w/ Transceive command for several bytes
             }
 
             StatusCode sc = WaitForCommandComplete(waitIrq);
@@ -316,7 +322,7 @@ namespace Driver.MfRc522
                 if (n > backData.Length) return StatusCode.NoRoom;
                 // if (n < backData.Length) return StatusCode.Error;
                 ReadRegister(Register.FifoData, backData);
-
+                // Console.WriteLine("Buffer from backdata Transceive")
                 DisplayBuffer(backData);
 
                 validBits = (byte)(ReadRegister(Register.Control) & 0x07);
@@ -362,9 +368,9 @@ namespace Driver.MfRc522
 
             for (int i = 0; i < 3; i++)
             {
-                for (int j = 0; j < 16; j++)
+                for (int j = 0; j < 15; j++)
                 {
-                    data[i][j] = 0xff;
+                    data[i][j] = 0x00;
                 }
             }
         }
@@ -384,16 +390,16 @@ namespace Driver.MfRc522
                     {
                         if (dataBlock[i] != null)
                         {
-                            var line = (char[])dataBlock[i];
+                            var line = (string)dataBlock[i];
                             if (line.Length > 16) throw new ArgumentException("dataBlock line must be 16 char. max lenght", nameof(line));
 
-                            foreach (char item in line)
-                            {
+                           // foreach (char item in line)
+                           // {
                                 for (int j = 0; j < line.Length; j++)
                                 {
-                                    data[i][j] = (byte)item;
+                                    data[i][j] = (byte)line[j];
                                 }
-                            }
+                            //}
                         }
                     }
                     sc = PutMifare1KSector(uid, sector, key, data, authenticateType);
@@ -426,7 +432,7 @@ namespace Driver.MfRc522
             byte numberOfBlocks = 4;
             var firstblock = sector * numberOfBlocks;
             var isTrailerBlock = true;
-            byte[] buffer = new byte[18];
+            //byte[] buffer = new byte[18];
             StatusCode sc = StatusCode.Ok;
 
             for (int i = numberOfBlocks - 1; i >= 0; i--)
@@ -440,6 +446,8 @@ namespace Driver.MfRc522
                 // Write block
                 else
                 {
+                    /// test
+                    //Debug.WriteLine("data= " + data[i].ToString());
                     sc = MifareWrite(blockAddr, data[i]);
                     if (sc != StatusCode.Ok) throw new Exception($"MifareWrite() failed:{sc}");
                 }
@@ -508,16 +516,30 @@ namespace Driver.MfRc522
 
         private StatusCode MifareWrite(byte blockAddr, byte[] buffer)
         {
-            byte[] cmdBuffer = new byte[4];
+            byte validBits = 0;
             var sc = StatusCode.Ok;
-            if (buffer == null || buffer.Length != 18) return StatusCode.NoRoom;
+            byte[] cmdBuffer = new byte[4];
+            byte[] dataBuffer = new byte[18];
+            Array.Copy(buffer, dataBuffer, 16);
+
+            if (buffer == null || buffer.Length != 16) return StatusCode.NoRoom;
+
             cmdBuffer[0] = (byte)PiccCommand.MifareWrite;
             cmdBuffer[1] = blockAddr;
             sc = CalculateCrc(cmdBuffer, 2, cmdBuffer, 2);
             if (sc != StatusCode.Ok) return sc;
-            byte validBits = 0;
 
-            sc = TransceiveData(cmdBuffer, buffer, ref validBits);
+            sc = TransceiveData(cmdBuffer, null, ref validBits);
+
+            if (sc == StatusCode.Ok)
+            { 
+                sc = CalculateCrc(buffer,16 , dataBuffer, 16);
+                // Debug.WriteLine("Data from databuffer MifareWrite");
+                DisplayBuffer(dataBuffer);
+                sc = TransceiveData(dataBuffer, null, ref validBits);
+                return sc;
+            }
+
             return sc;
 
             // Check CRC - This was to check the incoming (read) buffer data and we're writting here!
@@ -654,7 +676,7 @@ namespace Driver.MfRc522
                 if ((n & 0x01) == 0x01)
                 {
                     return StatusCode.Timeout;
-                }
+                };
             }
             return StatusCode.Timeout;
         }
