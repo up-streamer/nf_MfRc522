@@ -20,8 +20,8 @@ namespace testRC522
         private static MfRc522 _mfRc522;
         static void Main()
         {
-            Setup();
-            
+            _mfRc522 = new MfRc522("SPI1", 4, 5);
+
             Debug.WriteLine("###############################################");
             Debug.WriteLine("# SPI1");
             Debug.WriteLine("###############################################");
@@ -33,21 +33,27 @@ namespace testRC522
             Debug.WriteLine($"Version: 0x{_mfRc522.GetVersion():X}");
             Debug.WriteLine("");
 
-            //_mfRc522.Test();
+            //_mfRc522.Test(); //Basic test to troubleshoot comms issues.
+
             byte[] defaultKey = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
             byte writeSector = 0x2;
-            ArrayList writeData = new ArrayList();
-            writeData.Add("Test1");
-            writeData.Add(" Test2");
-            writeData.Add("  Test3");
 
-            InfiniteLoop(defaultKey);    
+            ArrayList writeData = new ArrayList
+            {
+                "Test1",
+                " Test2",
+                "  Test3"
+            };
 
-            //WriteSector(writeData, writeSector, defaultKey); //for write test, comment this and uncomment InfiniteLoop()
+            //for Read test, uncomment below and comment WriteSector()
+            InfiniteLoop(defaultKey);
+
+            //for Write test, uncomment below and comment InfiniteLoop()
+            //WriteSector(writeData, writeSector, defaultKey); 
         }
-        
- 
+
+
         private static void InfiniteLoop(byte[] key)
         {
             byte[] bufferAtqa = new byte[2];
@@ -55,9 +61,6 @@ namespace testRC522
 
             while (true)
             {
-                //test
-               // bufferAtqa[0] = 0x0;
-                //bufferAtqa[1] = 0x0;
                 if (_mfRc522.IsNewCardPresent(bufferAtqa))
                 {
                    Debug.WriteLine("Card detected...");
@@ -97,7 +100,6 @@ namespace testRC522
 
                 Thread.Sleep(1000);
             }
-            // ReSharper disable once FunctionNeverReturns
         }
 
         private static byte[][] ReadSector(byte sector, byte[] key)
@@ -177,14 +179,6 @@ namespace testRC522
                    Debug.WriteLine("PICC type: Unknown");
                     break;
             }
-        }
-        
-        private static void Setup()
-        {
-            _mfRc522 = new MfRc522("SPI1", 4, 5);
-            // _mfRc522 = new MfRc522(FEZ.SpiBus.Spi1, FEZ.GpioPin.D8, FEZ.GpioPin.D9);
-
-
         }
     }
 }
