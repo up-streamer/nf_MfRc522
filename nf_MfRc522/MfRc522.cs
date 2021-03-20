@@ -6,13 +6,6 @@ using Windows.Devices.Gpio;
 using Windows.Devices.Spi;
 using Driver.MfRc522.Constants;
 
-//using GHIElectronics.TinyCLR.Devices.Gpio;
-//using GHIElectronics.TinyCLR.Devices.Spi;
-//using Bauland.Others.Constants.MfRc522;
-
-// ReSharper disable MemberCanBePrivate.Global
-// ReSharper disable UnusedMember.Global
-
 namespace Driver.MfRc522
 {
     /// <summary>
@@ -21,7 +14,6 @@ namespace Driver.MfRc522
     public class MfRc522
     {
         private readonly GpioPin _resetPin;
-        //private readonly GpioPin _irqPin;
         private readonly SpiDevice _spi;
         private readonly byte[] _registerWriteBuffer;
         private readonly byte[] _dummyBuffer2;
@@ -43,21 +35,8 @@ namespace Driver.MfRc522
             _resetPin.SetDriveMode(GpioPinDriveMode.Output);
             _resetPin.Write(GpioPinValue.High);
 
-            //if (irqPin != -1)
-            //{
-            //    _irqPin = gpioCtl.OpenPin(irqPin);
-            //    _irqPin.SetDriveMode(GpioPinDriveMode.Input);
-            //    _irqPin.ValueChanged += _irqPin_ValueChanged;
-            //}
-
             var settings = new SpiConnectionSettings(csPin)
             {
-                // If necessary
-                //BitOrder = DataBitOrder.LSB,
-                //ChipSelectActiveState = false,
-              
-                //ChipSelectLine = csPin,
-                //ChipSelectType = SpiChipSelectType.Gpio,
                 ClockFrequency = 7_000_000, // Was 10_000_000 droppped due instabiities and bit rotate issues
                 DataBitLength = 8,
                 Mode = SpiMode.Mode0,
@@ -72,7 +51,8 @@ namespace Driver.MfRc522
 
         private void SetDefaultValues()
         {
-            WriteRegister(Register.RxMode, 0x00);  // new configs from Balboa
+            // New default values from Balboa's Arduino driver
+            WriteRegister(Register.RxMode, 0x00);  
             WriteRegister(Register.TxMode, 0x00);  
             WriteRegister(Register.ModeWith, 0x26);
 
@@ -96,6 +76,10 @@ namespace Driver.MfRc522
             SetRegisterBit(Register.TxControl, 0x03);
         }
 
+        /// <summary>
+        /// Basic test to troubleshoot comms issues.
+        /// Add other Register for test here.
+        /// <summary>
         public void Test()
         {
             for (int i = 0; i < 50; i++)
@@ -115,12 +99,6 @@ namespace Driver.MfRc522
                 Thread.Sleep(100);
 
                 Debug.WriteLine("");
-
-
-
-
-
-
             }
         }
 
@@ -185,7 +163,7 @@ namespace Driver.MfRc522
                     default:
                         return StatusCode.Error;
                 }
-                //buffer[0] = (byte)PiccCommand.SelCl1;
+
                 buffer[1] = nvb;
                 if (bitKnown != 0)
                 {
@@ -199,7 +177,7 @@ namespace Driver.MfRc522
                     if (crcStatus != StatusCode.Ok) return crcStatus;
                 }
 
-                //DisplayBuffer(buffer);
+                DisplayBuffer(buffer);
                 byte validbits = 0;
                 WriteRegister(Register.BitFraming, 0);
 
@@ -254,7 +232,7 @@ namespace Driver.MfRc522
             return StatusCode.Ok;
         }
 
-       // [ConditionalAttribute("MYDEBUG")]
+       [ConditionalAttribute("MYDEBUG")]
         private void DisplayBuffer(byte[] buffer)
         {
             Debug.WriteLine("#Data:");
@@ -289,7 +267,6 @@ namespace Driver.MfRc522
 
         private StatusCode CommunicateWithPicc(PcdCommand cmd, byte waitIrq, byte[] sendData, byte[] backData, ref byte validBits/*, byte rxAlign = 0, bool crcCheck = false*/)
         {
-
             byte txLastBits = validBits;
             byte bitFraming = txLastBits;
 
@@ -320,9 +297,8 @@ namespace Driver.MfRc522
             {
                 byte n = ReadRegister(Register.FifoLevel);
                 if (n > backData.Length) return StatusCode.NoRoom;
-                // if (n < backData.Length) return StatusCode.Error;
+                if (n < backData.Length) return StatusCode.Error;
                 ReadRegister(Register.FifoData, backData);
-                // Console.WriteLine("Buffer from backdata Transceive")
                 DisplayBuffer(backData);
 
                 validBits = (byte)(ReadRegister(Register.Control) & 0x07);
@@ -355,8 +331,8 @@ namespace Driver.MfRc522
                     return null;
             }
         }
-        private byte[][] data = new byte[3][];
 
+        private byte[][] data = new byte[3][];
         private bool init = false;
         private void InitData()
         {
@@ -375,7 +351,6 @@ namespace Driver.MfRc522
             }
         }
         
-        
         public StatusCode PutSector(ArrayList dataBlock, Uid uid, byte sector, byte[] key, PiccCommand authenticateType = PiccCommand.AuthenticateKeyA)
         {
             InitData();
@@ -393,20 +368,17 @@ namespace Driver.MfRc522
                             var line = (string)dataBlock[i];
                             if (line.Length > 16) throw new ArgumentException("dataBlock line must be 16 char. max lenght", nameof(line));
 
-                           // foreach (char item in line)
-                           // {
                                 for (int j = 0; j < line.Length; j++)
                                 {
                                     data[i][j] = (byte)line[j];
                                 }
-                            //}
                         }
                     }
                     sc = PutMifare1KSector(uid, sector, key, data, authenticateType);
                     return sc;
-                    
+                //  To be created...
                 // case PiccType.MifareUltralight:
-                //    return GetMifareUltraLight(pageOrSector);
+                // return PutMifareUltraLight(pageOrSector);
                 default:
                     return sc = StatusCode.Error;
             }
@@ -432,7 +404,7 @@ namespace Driver.MfRc522
             byte numberOfBlocks = 4;
             var firstblock = sector * numberOfBlocks;
             var isTrailerBlock = true;
-            //byte[] buffer = new byte[18];
+
             StatusCode sc = StatusCode.Ok;
 
             for (int i = numberOfBlocks - 1; i >= 0; i--)
@@ -446,8 +418,6 @@ namespace Driver.MfRc522
                 // Write block
                 else
                 {
-                    /// test
-                    //Debug.WriteLine("data= " + data[i].ToString());
                     sc = MifareWrite(blockAddr, data[i]);
                     if (sc != StatusCode.Ok) throw new Exception($"MifareWrite() failed:{sc}");
                 }
@@ -455,7 +425,6 @@ namespace Driver.MfRc522
                 {
                     isTrailerBlock = false;
                 }
-               /// Array.Copy(buffer, returnBuffer[i], 16); It is writting, no return data
             }
             return sc;
         }
@@ -534,20 +503,12 @@ namespace Driver.MfRc522
             if (sc == StatusCode.Ok)
             { 
                 sc = CalculateCrc(buffer,16 , dataBuffer, 16);
-                // Debug.WriteLine("Data from databuffer MifareWrite");
                 DisplayBuffer(dataBuffer);
                 sc = TransceiveData(dataBuffer, null, ref validBits);
                 return sc;
             }
 
             return sc;
-
-            // Check CRC - This was to check the incoming (read) buffer data and we're writting here!
-            //byte[] crc = new byte[2];
-            //sc = CalculateCrc(buffer, 16, crc, 0);
-            //if (sc != StatusCode.Ok) return sc;
-            //if (buffer[16] == crc[0] && buffer[17] == crc[1]) return StatusCode.Ok;
-            //return StatusCode.CrcError;
         }
 
         /// <summary>
@@ -711,8 +672,6 @@ namespace Driver.MfRc522
             _registerWriteBuffer[0] = (byte)((byte)register | 0x80);
             _registerWriteBuffer[1] = 0x00;
             _spi.TransferFullDuplex(_registerWriteBuffer, _dummyBuffer2);
-            Byte _tempByte = _dummyBuffer2[1];
-           //var  tempByte = (int) _tempByte << 4;
             return _dummyBuffer2[1];
         }
 
@@ -740,6 +699,5 @@ namespace Driver.MfRc522
             WriteRegister(register, (byte)(tmp & ~mask));
         }
         #endregion
-
     }
 }
