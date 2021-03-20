@@ -149,11 +149,14 @@ namespace testRC522
             for (int i = 0; i < buffer.Length; i++)
             {
                 var line = "";
+                var text = "";
                 for (int j = 0; j < buffer[i].Length; j++)
                 {
                     line += $"{buffer[i][j]:X2} ";
+                    text += Convert.ToChar(buffer[i][j]);
                 }
-                line += $"[{(accessRights[0] >> i) & 0x01} {(accessRights[1] >> i) & 0x01} {(accessRights[2] >> i) & 0x01}]";
+                line += $"[{(accessRights[0] >> i) & 0x01} {(accessRights[1] >> i) & 0x01} {(accessRights[2] >> i) & 0x01}] ";
+                line += text;
                Debug.WriteLine(line);
             }
         }
