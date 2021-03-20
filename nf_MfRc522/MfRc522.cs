@@ -332,8 +332,8 @@ namespace Driver.MfRc522
             }
         }
 
-        private byte[][] data = new byte[3][];
-        private bool init = false;
+        private readonly byte[][] data = new byte[3][];
+        private readonly bool init = false;
         private void InitData()
         {
             if (!init)
@@ -355,12 +355,14 @@ namespace Driver.MfRc522
         {
             InitData();
 
-            StatusCode sc = StatusCode.Ok;
             if (key == null || key.Length != 6) throw new ArgumentException("Key must be a byte[] of length 6.", nameof(key));
 
             switch (uid.GetPiccType())
             {
                 case PiccType.Mifare1K:
+
+                    if (sector > 15) throw new ArgumentOutOfRangeException(nameof(sector), "Sector must be between 0 and 15.");
+
                     for (int i = 0; i < 3; i++)
                     {
                         if (dataBlock[i] != null)
@@ -374,13 +376,12 @@ namespace Driver.MfRc522
                                 }
                         }
                     }
-                    sc = PutMifare1KSector(uid, sector, key, data, authenticateType);
-                    return sc;
+                    return PutMifare1KSector(uid, sector, key, data, authenticateType);
                 //  To be created...
                 // case PiccType.MifareUltralight:
                 // return PutMifareUltraLight(pageOrSector);
                 default:
-                    return sc = StatusCode.Error;
+                    return StatusCode.Error;
             }
 
         }
@@ -399,8 +400,7 @@ namespace Driver.MfRc522
             return resultBuffer;
         }
         private StatusCode PutMifare1KSector(Uid uid, byte sector, byte[] key, byte [][] data, PiccCommand cmd = PiccCommand.AuthenticateKeyA)
-        {
-            if (sector > 15) throw new ArgumentOutOfRangeException(nameof(sector), "Sector must be between 0 and 16.");
+        {            
             byte numberOfBlocks = 4;
             var firstblock = sector * numberOfBlocks;
             var isTrailerBlock = true;
@@ -485,13 +485,13 @@ namespace Driver.MfRc522
 
         private StatusCode MifareWrite(byte blockAddr, byte[] buffer)
         {
+            StatusCode sc;
             byte validBits = 0;
-            var sc = StatusCode.Ok;
+
+            if (buffer == null || buffer.Length != 16) return StatusCode.NoRoom;
             byte[] cmdBuffer = new byte[4];
             byte[] dataBuffer = new byte[18];
             Array.Copy(buffer, dataBuffer, 16);
-
-            if (buffer == null || buffer.Length != 16) return StatusCode.NoRoom;
 
             cmdBuffer[0] = (byte)PiccCommand.MifareWrite;
             cmdBuffer[1] = blockAddr;
@@ -499,15 +499,13 @@ namespace Driver.MfRc522
             if (sc != StatusCode.Ok) return sc;
 
             sc = TransceiveData(cmdBuffer, null, ref validBits);
+            if (sc != StatusCode.Ok) return sc;
 
-            if (sc == StatusCode.Ok)
-            { 
-                sc = CalculateCrc(buffer,16 , dataBuffer, 16);
-                DisplayBuffer(dataBuffer);
-                sc = TransceiveData(dataBuffer, null, ref validBits);
-                return sc;
-            }
+            sc = CalculateCrc(buffer, 16, dataBuffer, 16);
+            if (sc != StatusCode.Ok) return sc;
 
+            DisplayBuffer(dataBuffer);
+            sc = TransceiveData(dataBuffer, null, ref validBits);
             return sc;
         }
 
