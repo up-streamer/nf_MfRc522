@@ -37,20 +37,20 @@ namespace testRC522
 
             byte[] defaultKey = { 0xff, 0xff, 0xff, 0xff, 0xff, 0xff };
 
-            byte writeSector = 0x2;
+            byte writeSector = 0x3;
 
             ArrayList writeData = new ArrayList
             {
-                "Test1",
-                " Test2",
-                "  Test3"
+                "Test1 6789012345",
+                " Test2 789012345",
+                "  Test3 89012345"
             };
 
             //for Read test, uncomment below and comment WriteSector()
-            InfiniteLoop(defaultKey);
+            //InfiniteLoop(defaultKey);
 
             //for Write test, uncomment below and comment InfiniteLoop()
-            //WriteSector(writeData, writeSector, defaultKey); 
+            WriteSector(writeData, writeSector, defaultKey); 
         }
 
 
@@ -102,11 +102,19 @@ namespace testRC522
             }
         }
 
-        private static byte[][] ReadSector(byte sector, byte[] key)
+        private static void DisplaySector(byte sector, Uid uid, byte[] key)
         {
-            var uid = _mfRc522.PiccReadCardSerial();
             var buffer = _mfRc522.GetSector(uid, sector, key);
-            return buffer;
+            if (uid.GetPiccType() == PiccType.Mifare1K)
+            {
+                var c = _mfRc522.GetAccessRights(buffer);
+                Display1kBuffer(buffer, c);
+            }
+            else if (uid.GetPiccType() == PiccType.MifareUltralight)
+            {
+                DisplayUltralightBuffer(buffer);
+
+            }
         }
 
         private static void WriteSector(ArrayList data, byte sector, byte[] key)
@@ -118,17 +126,35 @@ namespace testRC522
             {
                 if (_mfRc522.IsNewCardPresent(bufferAtqa))
                 {
+
                     Debug.WriteLine("Card detected...");
                     Debug.WriteLine($"ATQA: 0x{bufferAtqa[1]:X2},0x{bufferAtqa[0]:X2}");
 
                     var uid = _mfRc522.PiccReadCardSerial();
-                    _mfRc522.PutSector(data, uid, sector, key);
+                    if (uid != null)
+                    {
+                        DisplayUid(uid);
+                        try
+                        {
+                            Debug.WriteLine($"Sector {sector} content was...");
+                            DisplaySector(sector, uid, key);
 
+                            _mfRc522.PutSector(data, uid, sector, key);
+
+                            Debug.WriteLine("");
+                            Debug.WriteLine($"Now Sector {sector} content is...");
+                            DisplaySector(sector, uid, key);
+                        }
+                        catch (Exception ex)
+                        {
+                            Debug.WriteLine(ex.Message);
+                        }
+                    }
                     tryWrite = false;
-                    _mfRc522.Halt();
-                    _mfRc522.StopCrypto();
                 }
             }
+            _mfRc522.Halt();
+            _mfRc522.StopCrypto();
         }
 
         private static void DisplayUltralightBuffer(byte[][] buffer)
