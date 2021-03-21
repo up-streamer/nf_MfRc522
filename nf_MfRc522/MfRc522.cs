@@ -40,7 +40,6 @@ namespace Driver.MfRc522
                 ClockFrequency = 7_000_000, // Was 10_000_000 droppped due instabiities and bit rotate issues
                 DataBitLength = 8,
                 Mode = SpiMode.Mode0,
-             
             };
 
             _spi = SpiDevice.FromId(spiBus, settings);
@@ -52,13 +51,13 @@ namespace Driver.MfRc522
         private void SetDefaultValues()
         {
             // New default values from Balboa's Arduino driver
-            WriteRegister(Register.RxMode, 0x00);  
-            WriteRegister(Register.TxMode, 0x00);  
+            WriteRegister(Register.RxMode, 0x00);
+            WriteRegister(Register.TxMode, 0x00);
             WriteRegister(Register.ModeWith, 0x26);
 
             // Set Timer for Timeout
             WriteRegister(Register.TimerMode, 0x80);
-            WriteRegister(Register.TimerPrescaler, 0xA9); 
+            WriteRegister(Register.TimerPrescaler, 0xA9);
             WriteRegister(Register.TimerReloadHigh, 0x06);
             WriteRegister(Register.TimerReloadLow, 0xE8);
 
@@ -232,7 +231,7 @@ namespace Driver.MfRc522
             return StatusCode.Ok;
         }
 
-       [ConditionalAttribute("MYDEBUG")]
+        [ConditionalAttribute("MYDEBUG")]
         private void DisplayBuffer(byte[] buffer)
         {
             Debug.WriteLine("#Data:");
@@ -337,7 +336,8 @@ namespace Driver.MfRc522
         private void InitData()
         {
             if (!init)
-            {   data[0] = new byte[16];
+            {
+                data[0] = new byte[16];
                 data[1] = new byte[16];
                 data[2] = new byte[16];
             }
@@ -350,7 +350,7 @@ namespace Driver.MfRc522
                 }
             }
         }
-        
+
         public StatusCode PutSector(ArrayList dataBlock, Uid uid, byte sector, byte[] key, PiccCommand authenticateType = PiccCommand.AuthenticateKeyA)
         {
             InitData();
@@ -370,10 +370,10 @@ namespace Driver.MfRc522
                             var line = (string)dataBlock[i];
                             if (line.Length > 16) throw new ArgumentException("dataBlock line must be 16 char. max lenght", nameof(line));
 
-                                for (int j = 0; j < line.Length; j++)
-                                {
-                                    data[i][j] = (byte)line[j];
-                                }
+                            for (int j = 0; j < line.Length; j++)
+                            {
+                                data[i][j] = (byte)line[j];
+                            }
                         }
                     }
                     return PutMifare1KSector(uid, sector, key, data, authenticateType);
@@ -383,7 +383,6 @@ namespace Driver.MfRc522
                 default:
                     return StatusCode.Error;
             }
-
         }
 
         private byte[][] GetMifareUltraLight(byte page)
@@ -399,8 +398,8 @@ namespace Driver.MfRc522
                 Array.Copy(buffer, j * 4, resultBuffer[j], 0, 4);
             return resultBuffer;
         }
-        private StatusCode PutMifare1KSector(Uid uid, byte sector, byte[] key, byte [][] data, PiccCommand cmd = PiccCommand.AuthenticateKeyA)
-        {            
+        private StatusCode PutMifare1KSector(Uid uid, byte sector, byte[] key, byte[][] data, PiccCommand cmd = PiccCommand.AuthenticateKeyA)
+        {
             byte numberOfBlocks = 4;
             var firstblock = sector * numberOfBlocks;
             var isTrailerBlock = true;
