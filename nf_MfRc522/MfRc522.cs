@@ -350,8 +350,15 @@ namespace Driver.MfRc522
                 }
             }
         }
-
-        public StatusCode PutSector(ArrayList dataBlock, Uid uid, byte sector, byte[] key, PiccCommand authenticateType = PiccCommand.AuthenticateKeyA)
+        /// <summary>
+        /// Write a page or a sector to a card
+        /// </summary>
+        /// <param name="uid"> uid of card to read</param>
+        /// <param name="pageOrSector"> number of page or sector to read</param>
+        /// <param name="key">key to authenticate (not used with Ultralight)</param>
+        /// <param name="authenticateType">type of authentication (not used with Ultralight): A (default) or B</param>
+        /// <returns></returns>
+        public StatusCode PutSector(ArrayList dataBlock, Uid uid, byte pageOrSector, byte[] key, PiccCommand authenticateType = PiccCommand.AuthenticateKeyA)
         {
             InitData();
 
@@ -361,7 +368,7 @@ namespace Driver.MfRc522
             {
                 case PiccType.Mifare1K:
 
-                    if (sector > 15) throw new ArgumentOutOfRangeException(nameof(sector), "Sector must be between 0 and 15.");
+                    if (pageOrSector > 15) throw new ArgumentOutOfRangeException(nameof(pageOrSector), "Sector must be between 0 and 15.");
 
                     for (int i = 0; i < 3; i++)
                     {
@@ -376,15 +383,35 @@ namespace Driver.MfRc522
                             }
                         }
                     }
-                    return PutMifare1KSector(uid, sector, key, data, authenticateType);
-                //  To be created...
-                // case PiccType.MifareUltralight:
-                // return PutMifareUltraLight(pageOrSector);
+                    return PutMifare1KSector(uid, pageOrSector, key, data, authenticateType);
+
+                case PiccType.MifareUltralight:
+
+                    if (pageOrSector < 4 ||  pageOrSector > 15) throw new ArgumentOutOfRangeException(nameof(pageOrSector), "Sector must be between 4 and 15.");
+                   
+                    byte[] dataPage = new byte[4];
+                    if (dataBlock != null)
+                    {        
+                        var line = (string)dataBlock[0];
+                        if (line.Length > 4) throw new ArgumentException("dataBlock line must be 4 char. max lenght");
+                        for (int j = 0; j < line.Length; j++)
+                        {
+                            dataPage[j] = (byte)line[j];
+                        }
+                    }
+                    return PutMifareUltraLight(pageOrSector, dataPage);
+
                 default:
                     return StatusCode.Error;
             }
         }
 
+        private StatusCode PutMifareUltraLight(byte page, byte[] data)
+        {
+            byte[] buffer = new byte[16];
+            Array.Copy(buffer, 12, data, 0, 4);
+            return MifareWrite(page, buffer);
+        }
         private byte[][] GetMifareUltraLight(byte page)
         {
 

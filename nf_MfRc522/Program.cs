@@ -39,7 +39,7 @@ namespace testRC522
 
             byte writeSector = 0x3;
 
-            ArrayList writeData = new ArrayList
+            ArrayList writeData = new ArrayList //For MifareUltraLight: 1 line and 4 bytes
             {
                 "Test1 6789012345",
                 " Test2 789012345",
